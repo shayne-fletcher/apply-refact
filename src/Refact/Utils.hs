@@ -1,5 +1,6 @@
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE CPP #-}
 
 module Refact.Utils
   ( -- * Synonyms
@@ -92,7 +93,11 @@ getAnnSpan = srcSpanToAnnSpan . GHC.getLoc
 --   GHC.Located new ->
 --   M (GHC.Located new)
 modifyAnnKey ::
+#if MIN_VERSION_ghc(9,10,0)
+  (Data mod, Data t, Data old, Data new, Typeable t) =>
+#else
   (Data mod, Data t, Data old, Data new, Monoid t, Typeable t) =>
+#endif
   mod ->
   GHC.LocatedAn t old ->
   GHC.LocatedAn t new ->
@@ -118,7 +123,7 @@ modifyAnnKey _m e1 e2 = do
 --        should keep the backquotes, but currently no test case fails because of it.
 handleBackquotes ::
   forall t old new.
-  (Data t, Data old, Data new, Monoid t, Typeable t) =>
+  (Data t, Data old, Data new, Typeable t) =>
   GHC.LocatedAn t old ->
   GHC.LocatedAn t new ->
   GHC.LocatedAn t new
@@ -131,17 +136,33 @@ handleBackquotes old new@(GHC.L loc _) =
         ln' =
           if GHC.locA l == GHC.locA loc
             then case cast old :: Maybe (GHC.LHsExpr GHC.GhcPs) of
+#if MIN_VERSION_ghc(9,10,0)
+              Just (GHC.L _ (GHC.HsVar _ (GHC.L (GHC.EpAnn _ ann _) _)))
+#else
               Just (GHC.L _ (GHC.HsVar _ (GHC.L (GHC.SrcSpanAnn (GHC.EpAnn _ ann _) _) _)))
+#endif
                 -- scenario 1
                 | GHC.NameAnn GHC.NameBackquotes _ _ _ _ <- ann ->
+
                   case ln of
+#if MIN_VERSION_ghc(9,10,0)
+                    GHC.EpAnn a _ cs -> GHC.EpAnn a ann cs
+#else
                     (GHC.SrcSpanAnn (GHC.EpAnn a _ cs) ll) -> GHC.SrcSpanAnn (GHC.EpAnn a ann cs) ll
                     (GHC.SrcSpanAnn GHC.EpAnnNotUsed ll) ->
                       GHC.SrcSpanAnn (GHC.EpAnn (GHC.spanAsAnchor ll) ann GHC.emptyComments) ll
+#endif
                 -- scenario 2
+#if MIN_VERSION_ghc(9,10,0)
+                | GHC.EpAnn a ann' cs <- ln,
+                  GHC.NameAnn GHC.NameBackquotes _ _ _ _ <- ann' ->
+                  GHC.EpAnn a ann cs
+#else
                 | GHC.SrcSpanAnn (GHC.EpAnn a ann' cs) ll <- ln,
                   GHC.NameAnn GHC.NameBackquotes _ _ _ _ <- ann' ->
                   GHC.SrcSpanAnn (GHC.EpAnn a ann cs) ll
+#endif
+
               Just _ -> ln
               Nothing -> ln
             else ln

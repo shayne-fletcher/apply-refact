@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE CPP #-}
 
 module Refact.Fixity (applyFixities) where
 
@@ -31,7 +32,11 @@ getIdent _ = error "Must be HsVar"
 mkOpAppRn ::
   [(String, GHC.Fixity)] ->
   GHC.SrcSpanAnnA ->
+#if MIN_VERSION_ghc(9,10,0)
+  [GHC.AddEpAnn] ->
+#else
   GHC.EpAnn [GHC.AddEpAnn] ->
+#endif
   Expr -> -- Left operand; already rearranged
   Expr ->
   GHC.Fixity -> -- Operator and fixity

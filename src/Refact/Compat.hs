@@ -171,7 +171,12 @@ ppp pst = concatMap unDecorated $ fmap (diagnosticMessage . errMsgDiagnostic) $ 
 ppp pst = concatMap unDecorated (errMsgDiagnostic <$> bagToList pst)
 #endif
 
+
+#if MIN_VERSION_ghc(9,10,0)
+type FunBind = HsMatchContext (GenLocated SrcSpanAnnN RdrName)
+#else
 type FunBind = HsMatchContext GhcPs
+#endif
 
 pattern RealSrcLoc' :: RealSrcLoc -> SrcLoc
 pattern RealSrcLoc' r <- RealSrcLoc r _ where
